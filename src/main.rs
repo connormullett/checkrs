@@ -150,8 +150,7 @@ fn verify(cfg: &Config) {
         match read_file(path) {
             Ok(data) => match parse_checksum(data) {
                 Ok(checksum) => {
-                    let success = verify_checksum(checksum, &path);
-                    if !success {
+                    if !verify_checksum(checksum, &path) {
                         warnings += 1;
                     }
                 }
