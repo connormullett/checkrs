@@ -60,6 +60,18 @@ struct Checksum {
     path: PathBuf,
 }
 
+enum ChecksumError {
+    ImproperFormat,
+}
+
+impl ToString for ChecksumError {
+    fn to_string(&self) -> String {
+        match self {
+            ChecksumError::ImproperFormat => format!("no properly formatted checksum lines found"),
+        }
+    }
+}
+
 impl ToString for Checksum {
     fn to_string(&self) -> String {
         format!("{}  {}", self.hash, self.path.display())
@@ -70,20 +82,73 @@ fn read_file(path: &PathBuf) -> io::Result<String> {
     Ok(fs::read_to_string(path)?)
 }
 
-fn generate(paths: Vec<PathBuf>) {
-    for path in paths {
+fn generate(cfg: &Config) {
+    for path in &cfg.input_files {
         let mut hasher = Sha256::new();
-        if let Ok(data) = read_file(&path) {
-            hasher.update(data);
-            let digest = hasher.finalize();
-            let hash = hex::encode(digest);
-            let checksum = Checksum { hash, path };
-            println!("{}", checksum.to_string());
+        match read_file(&path) {
+            Ok(data) => {
+                hasher.update(data);
+                let digest = hasher.finalize();
+                let hash = hex::encode(digest);
+
+                let checksum = Checksum {
+                    hash,
+                    path: path.clone(),
+                };
+
+                println!("{}", checksum.to_string());
+            }
+            Err(e) => println!("{}: {}", path.display(), e.to_string()),
         }
     }
 }
 
-fn check() {}
+fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
+    // FIXME: File names containing double spaces might mess this up
+    let mut file_contents: Vec<&str> = data.split("  ").collect();
+    if file_contents.is_empty() || file_contents.len() > 2 {
+        return Err(ChecksumError::ImproperFormat);
+    } else {
+        let path = match file_contents.pop() {
+            Some(path) => PathBuf::from(path),
+            None => return Err(ChecksumError::ImproperFormat),
+        };
+
+        let hash = match file_contents.pop() {
+            Some(data) => data.to_string(),
+            None => return Err(ChecksumError::ImproperFormat),
+        };
+
+        Ok(Checksum { path, hash })
+    }
+}
+
+fn verify_checksum(checksum: Checksum, path: &PathBuf) {
+    match read_file(&checksum.path) {
+        Ok(file_content) => {
+            let mut hasher = Sha256::new();
+            hasher.update(file_content);
+            let digest = hasher.finalize();
+            let hex = hex::encode(digest);
+
+            let status = if hex == checksum.hash { "OK" } else { "FAILED" };
+            println!("{}: {}", path.display(), status);
+        }
+        Err(e) => println!("{}: {}", path.display(), e.to_string()),
+    };
+}
+
+fn verify(cfg: &Config) {
+    for path in &cfg.input_files {
+        match read_file(path) {
+            Ok(data) => match parse_checksum(data) {
+                Ok(checksum) => verify_checksum(checksum, &path),
+                Err(e) => println!("{}: {}", path.display(), e.to_string()),
+            },
+            Err(e) => println!("{}: {}", path.display(), e.to_string()),
+        };
+    }
+}
 
 fn main() {
     let opt = Opt::from_args();
@@ -91,8 +156,8 @@ fn main() {
     let cfg = Config::from_opts(&opt);
 
     if cfg.check {
-        check()
+        verify(&cfg)
     } else {
-        generate(cfg.input_files)
+        generate(&cfg)
     }
 }
