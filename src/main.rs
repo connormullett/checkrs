@@ -33,7 +33,6 @@ struct Opt {
     input_files: Vec<PathBuf>,
 }
 
-#[allow(dead_code)]
 struct Config {
     check: bool,
     ignore_missing: bool,
@@ -100,7 +99,7 @@ fn generate(cfg: &Config) {
 
                 println!("{}", checksum.to_string());
             }
-            Err(e) => println!("{}: {}", path.display(), e.to_string()),
+            Err(e) => print_status(cfg, &path, e.to_string()),
         }
     }
 }
@@ -125,7 +124,7 @@ fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
     }
 }
 
-fn verify_checksum(checksum: Checksum, path: &PathBuf) -> bool {
+fn verify_checksum(cfg: &Config, checksum: Checksum, path: &PathBuf) -> bool {
     match read_file(&checksum.path) {
         Ok(file_content) => {
             let mut hasher = Sha256::new();
@@ -134,11 +133,11 @@ fn verify_checksum(checksum: Checksum, path: &PathBuf) -> bool {
             let hex = hex::encode(digest);
 
             let status = if hex == checksum.hash { "OK" } else { "FAILED" };
-            println!("{}: {}", path.display(), status);
+            print_status(cfg, &path, status.to_string());
             hex == checksum.hash
         }
         Err(e) => {
-            println!("{}: {}", path.display(), e.to_string());
+            print_status(cfg, &path, e.to_string());
             false
         }
     }
@@ -150,22 +149,28 @@ fn verify(cfg: &Config) {
         match read_file(path) {
             Ok(data) => match parse_checksum(data) {
                 Ok(checksum) => {
-                    if !verify_checksum(checksum, &path) {
+                    if !verify_checksum(cfg, checksum, &path) {
                         warnings += 1;
                     }
                 }
                 Err(e) => {
-                    println!("{}: {}", path.display(), e.to_string());
+                    print_status(cfg, &path, e.to_string());
                 }
             },
             Err(e) => {
-                println!("{}: {}", path.display(), e.to_string());
+                print_status(cfg, &path, e.to_string());
             }
         };
     }
 
     if warnings > 0 {
         println!("WARNING: {} computed checksum did NOT match", warnings);
+    }
+}
+
+fn print_status(cfg: &Config, path: &PathBuf, msg: String) {
+    if !cfg.quiet {
+        println!("{}: {}", path.display(), msg);
     }
 }
 
