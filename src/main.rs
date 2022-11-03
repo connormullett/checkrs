@@ -80,6 +80,7 @@ impl ToString for ChecksumError {
 }
 
 fn read_file(path: &PathBuf) -> io::Result<String> {
+    // FIXME: read to bytes (Strings are UTF-8 encoded, wont work with binary formats)
     Ok(fs::read_to_string(path)?)
 }
 
