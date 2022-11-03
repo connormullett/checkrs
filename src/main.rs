@@ -124,7 +124,7 @@ fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
     }
 }
 
-fn verify_checksum(checksum: Checksum, path: &PathBuf) {
+fn verify_checksum(checksum: Checksum, path: &PathBuf) -> bool {
     match read_file(&checksum.path) {
         Ok(file_content) => {
             let mut hasher = Sha256::new();
@@ -134,23 +134,35 @@ fn verify_checksum(checksum: Checksum, path: &PathBuf) {
 
             let status = if hex == checksum.hash { "OK" } else { "FAILED" };
             println!("{}: {}", path.display(), status);
+            true
         }
-        Err(e) => println!("{}: {}", path.display(), e.to_string()),
-    };
+        Err(e) => {
+            println!("{}: {}", path.display(), e.to_string());
+            false
+        }
+    }
 }
 
 fn verify(cfg: &Config) {
+    let mut warnings = 0;
     for path in &cfg.input_files {
         match read_file(path) {
             Ok(data) => match parse_checksum(data) {
-                Ok(checksum) => verify_checksum(checksum, &path),
-                Err(e) => println!("{}: {}", path.display(), e.to_string()),
+                Ok(checksum) => {
+                    verify_checksum(checksum, &path);
+                }
+                Err(e) => {
+                    println!("{}: {}", path.display(), e.to_string());
+                    warnings += 1;
+                }
             },
             Err(e) => {
                 println!("{}: {}", path.display(), e.to_string());
             }
         };
     }
+
+    println!("WARNING: {} computed checksum did NOT match", warnings);
 }
 
 fn main() {
