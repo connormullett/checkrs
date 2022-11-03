@@ -79,8 +79,11 @@ impl ToString for ChecksumError {
     }
 }
 
-fn read_file(path: &PathBuf) -> io::Result<String> {
-    // FIXME: read to bytes (Strings are UTF-8 encoded, wont work with binary formats)
+fn read_file(path: &PathBuf) -> io::Result<Vec<u8>> {
+    Ok(fs::read(path)?)
+}
+
+fn read_file_to_string(path: &PathBuf) -> io::Result<String> {
     Ok(fs::read_to_string(path)?)
 }
 
@@ -108,7 +111,6 @@ fn generate(cfg: &Config) {
 }
 
 fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
-    // FIXME: File names containing double spaces might mess this up
     let mut file_contents: Vec<&str> = data.trim().split("  ").collect();
     if file_contents.is_empty() || file_contents.len() > 2 {
         return Err(ChecksumError::ImproperFormat);
@@ -151,13 +153,14 @@ fn verify_checksum(cfg: &Config, checksum: Checksum, path: &PathBuf) -> bool {
 fn verify(cfg: &Config) {
     let mut warnings = 0;
     for path in &cfg.input_files {
-        match read_file(path) {
+        match read_file_to_string(path) {
             Ok(data) => match parse_checksum(data) {
                 Ok(checksum) => {
                     if !verify_checksum(cfg, checksum, &path) {
                         warnings += 1;
                     }
                 }
+
                 Err(e) => {
                     if cfg.strict {
                         process::exit(1);
