@@ -55,6 +55,7 @@ impl Config {
     }
 }
 
+#[derive(Debug)]
 struct Checksum {
     hash: String,
     path: PathBuf,
@@ -105,7 +106,7 @@ fn generate(cfg: &Config) {
 
 fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
     // FIXME: File names containing double spaces might mess this up
-    let mut file_contents: Vec<&str> = data.split("  ").collect();
+    let mut file_contents: Vec<&str> = data.trim().split("  ").collect();
     if file_contents.is_empty() || file_contents.len() > 2 {
         return Err(ChecksumError::ImproperFormat);
     } else {
@@ -145,7 +146,9 @@ fn verify(cfg: &Config) {
                 Ok(checksum) => verify_checksum(checksum, &path),
                 Err(e) => println!("{}: {}", path.display(), e.to_string()),
             },
-            Err(e) => println!("{}: {}", path.display(), e.to_string()),
+            Err(e) => {
+                println!("{}: {}", path.display(), e.to_string());
+            }
         };
     }
 }
