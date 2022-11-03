@@ -1,4 +1,4 @@
-use std::{fs, io, path::PathBuf};
+use std::{fs, io, path::PathBuf, process};
 
 use sha2::{Digest, Sha256};
 use structopt::StructOpt;
@@ -84,6 +84,7 @@ fn read_file(path: &PathBuf) -> io::Result<String> {
 }
 
 fn generate(cfg: &Config) {
+    let mut warnings = 0;
     for path in &cfg.input_files {
         let mut hasher = Sha256::new();
         match read_file(&path) {
@@ -99,7 +100,10 @@ fn generate(cfg: &Config) {
 
                 println!("{}", checksum.to_string());
             }
-            Err(e) => print_status(cfg, &path, e.to_string()),
+            Err(e) => {
+                print_status(cfg, &path, e.to_string());
+                warnings += 1;
+            }
         }
     }
 }
@@ -156,6 +160,10 @@ fn verify(cfg: &Config) {
                     }
                 }
                 Err(e) => {
+                    if cfg.strict {
+                        process::exit(1);
+                    }
+
                     if cfg.warn {
                         print_status(cfg, &path, e.to_string());
                     }
