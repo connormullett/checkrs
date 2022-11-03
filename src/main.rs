@@ -137,7 +137,9 @@ fn verify_checksum(cfg: &Config, checksum: Checksum, path: &PathBuf) -> bool {
             hex == checksum.hash
         }
         Err(e) => {
-            print_status(cfg, &path, e.to_string());
+            if !cfg.ignore_missing {
+                print_status(cfg, &path, e.to_string());
+            }
             false
         }
     }
@@ -154,11 +156,15 @@ fn verify(cfg: &Config) {
                     }
                 }
                 Err(e) => {
-                    print_status(cfg, &path, e.to_string());
+                    if cfg.warn {
+                        print_status(cfg, &path, e.to_string());
+                    }
                 }
             },
             Err(e) => {
-                print_status(cfg, &path, e.to_string());
+                if !cfg.ignore_missing {
+                    print_status(cfg, &path, e.to_string());
+                }
             }
         };
     }
