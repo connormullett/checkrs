@@ -33,6 +33,7 @@ struct Opt {
     input_files: Vec<PathBuf>,
 }
 
+#[allow(dead_code)]
 struct Config {
     check: bool,
     ignore_missing: bool,
@@ -134,7 +135,7 @@ fn verify_checksum(checksum: Checksum, path: &PathBuf) -> bool {
 
             let status = if hex == checksum.hash { "OK" } else { "FAILED" };
             println!("{}: {}", path.display(), status);
-            true
+            hex == checksum.hash
         }
         Err(e) => {
             println!("{}: {}", path.display(), e.to_string());
@@ -149,11 +150,13 @@ fn verify(cfg: &Config) {
         match read_file(path) {
             Ok(data) => match parse_checksum(data) {
                 Ok(checksum) => {
-                    verify_checksum(checksum, &path);
+                    let success = verify_checksum(checksum, &path);
+                    if !success {
+                        warnings += 1;
+                    }
                 }
                 Err(e) => {
                     println!("{}: {}", path.display(), e.to_string());
-                    warnings += 1;
                 }
             },
             Err(e) => {
@@ -162,7 +165,9 @@ fn verify(cfg: &Config) {
         };
     }
 
-    println!("WARNING: {} computed checksum did NOT match", warnings);
+    if warnings > 0 {
+        println!("WARNING: {} computed checksum did NOT match", warnings);
+    }
 }
 
 fn main() {
