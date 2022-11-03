@@ -84,7 +84,6 @@ fn read_file(path: &PathBuf) -> io::Result<String> {
 }
 
 fn generate(cfg: &Config) {
-    let mut warnings = 0;
     for path in &cfg.input_files {
         let mut hasher = Sha256::new();
         match read_file(&path) {
@@ -102,7 +101,6 @@ fn generate(cfg: &Config) {
             }
             Err(e) => {
                 print_status(cfg, &path, e.to_string());
-                warnings += 1;
             }
         }
     }
