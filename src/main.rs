@@ -61,6 +61,12 @@ struct Checksum {
     path: PathBuf,
 }
 
+impl ToString for Checksum {
+    fn to_string(&self) -> String {
+        format!("{}  {}", self.hash, self.path.display())
+    }
+}
+
 enum ChecksumError {
     ImproperFormat,
 }
@@ -70,12 +76,6 @@ impl ToString for ChecksumError {
         match self {
             ChecksumError::ImproperFormat => format!("no properly formatted checksum lines found"),
         }
-    }
-}
-
-impl ToString for Checksum {
-    fn to_string(&self) -> String {
-        format!("{}  {}", self.hash, self.path.display())
     }
 }
 
