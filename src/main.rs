@@ -117,22 +117,10 @@ fn generate(cfg: &Config) {
 }
 
 fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
-    let mut file_contents: Vec<&str> = data.trim().split("  ").collect();
-    if file_contents.is_empty() || file_contents.len() > 2 {
-        return Err(ChecksumError::ImproperFormat);
-    } else {
-        let path = match file_contents.pop() {
-            Some(path) => PathBuf::from(path),
-            None => return Err(ChecksumError::ImproperFormat),
-        };
-
-        let hash = match file_contents.pop() {
-            Some(data) => data.to_string(),
-            None => return Err(ChecksumError::ImproperFormat),
-        };
-
-        Ok(Checksum { path, hash })
-    }
+    let mut file_contents = data.trim().split("  ");
+    let path = file_contents.next().ok_or_else(|| ChecksumError::ImproperFormat)?.into();
+    let hash = file_contents.next().ok_or_else(|| ChecksumError::ImproperFormat)?.to_string();
+    Ok(Checksum { path, hash })
 }
 
 fn verify_checksum(cfg: &Config, checksum: &Checksum, path: &PathBuf) -> bool {
