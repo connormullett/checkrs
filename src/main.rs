@@ -1,4 +1,4 @@
-use std::{fs, io, path::PathBuf, process};
+use std::{fs, io, path::PathBuf};
 
 use sha2::{Digest, Sha256};
 use structopt::StructOpt;
@@ -33,6 +33,7 @@ struct Opt {
     input_files: Vec<PathBuf>,
 }
 
+#[allow(unused)]
 struct Config {
     check: bool,
     ignore_missing: bool,
@@ -53,6 +54,11 @@ impl Config {
             input_files: opt.input_files.clone(),
         }
     }
+}
+
+struct RawChecksum {
+    pub data: String,
+    pub path: PathBuf,
 }
 
 #[derive(Debug)]
@@ -129,7 +135,7 @@ fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
     }
 }
 
-fn verify_checksum(cfg: &Config, checksum: Checksum, path: &PathBuf) -> bool {
+fn verify_checksum(cfg: &Config, checksum: &Checksum, path: &PathBuf) -> bool {
     match read_file(&checksum.path) {
         Ok(file_content) => {
             let mut hasher = Sha256::new();
@@ -151,37 +157,22 @@ fn verify_checksum(cfg: &Config, checksum: Checksum, path: &PathBuf) -> bool {
 }
 
 fn verify(cfg: &Config) {
-    let mut warnings = 0;
-    for path in &cfg.input_files {
-        match read_file_to_string(path) {
-            Ok(data) => match parse_checksum(data) {
-                Ok(checksum) => {
-                    if !verify_checksum(cfg, checksum, &path) {
-                        warnings += 1;
-                    }
-                }
-
-                Err(e) => {
-                    if cfg.strict {
-                        process::exit(1);
-                    }
-
-                    if cfg.warn {
-                        print_status(cfg, &path, e.to_string());
-                    }
-                }
-            },
-            Err(e) => {
-                if !cfg.ignore_missing {
-                    print_status(cfg, &path, e.to_string());
-                }
-            }
-        };
-    }
-
-    if warnings > 0 {
-        println!("WARNING: {} computed checksum did NOT match", warnings);
-    }
+    cfg.input_files.iter()
+        .map(|path| {
+            read_file_to_string(path).map_err(|e| print_status(cfg, path, e.to_string())).ok().map(|data| {
+                RawChecksum { data, path: path.clone() }
+            })
+        })
+        .flatten()
+        .map(|raw_checksum| {
+            parse_checksum(raw_checksum.data)
+                .map_err(|e| print_status(cfg, &raw_checksum.path, e.to_string()))
+                .ok()
+        })
+        .flatten()
+        .for_each(|ref checksum| {
+            verify_checksum(cfg, checksum, &checksum.path);
+        })
 }
 
 fn print_status(cfg: &Config, path: &PathBuf, msg: String) {
@@ -199,5 +190,5 @@ fn main() {
         verify(&cfg)
     } else {
         generate(&cfg)
-    }
+    };
 }
