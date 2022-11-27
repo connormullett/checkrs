@@ -21,25 +21,14 @@ struct Opt {
     #[structopt(short, long)]
     quiet: bool,
 
-    /// exit non-zero for improperly formated checksum lines
-    #[structopt(short, long)]
-    strict: bool,
-
-    /// warn about improperly formatted checksum lines
-    #[structopt(short, long)]
-    warn: bool,
-
     #[structopt(parse(from_os_str))]
     input_files: Vec<PathBuf>,
 }
 
-#[allow(unused)]
 struct Config {
     check: bool,
     ignore_missing: bool,
     quiet: bool,
-    strict: bool,
-    warn: bool,
     input_files: Vec<PathBuf>,
 }
 
@@ -49,8 +38,6 @@ impl Config {
             check: opt.check,
             ignore_missing: opt.ignore_missing,
             quiet: opt.quiet,
-            strict: opt.strict,
-            warn: opt.warn,
             input_files: opt.input_files.clone(),
         }
     }
