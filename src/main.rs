@@ -1,4 +1,4 @@
-use std::{fs, io, path::PathBuf};
+use std::{fs, path::{PathBuf, Path}};
 
 use sha2::{Digest, Sha256};
 use structopt::StructOpt;
@@ -80,23 +80,15 @@ enum ChecksumError {
 impl ToString for ChecksumError {
     fn to_string(&self) -> String {
         match self {
-            ChecksumError::ImproperFormat => format!("no properly formatted checksum lines found"),
+            ChecksumError::ImproperFormat => "no properly formatted checksum lines found".to_string(),
         }
     }
-}
-
-fn read_file(path: &PathBuf) -> io::Result<Vec<u8>> {
-    Ok(fs::read(path)?)
-}
-
-fn read_file_to_string(path: &PathBuf) -> io::Result<String> {
-    Ok(fs::read_to_string(path)?)
 }
 
 fn generate(cfg: &Config) {
     for path in &cfg.input_files {
         let mut hasher = Sha256::new();
-        match read_file(&path) {
+        match fs::read(path) {
             Ok(data) => {
                 hasher.update(data);
                 let digest = hasher.finalize();
@@ -110,7 +102,7 @@ fn generate(cfg: &Config) {
                 println!("{}", checksum.to_string());
             }
             Err(e) => {
-                print_status(cfg, &path, e.to_string());
+                print_status(cfg, path, e.to_string());
             }
         }
     }
@@ -118,13 +110,13 @@ fn generate(cfg: &Config) {
 
 fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
     let mut file_contents = data.trim().split("  ");
-    let path = file_contents.next().ok_or_else(|| ChecksumError::ImproperFormat)?.into();
-    let hash = file_contents.next().ok_or_else(|| ChecksumError::ImproperFormat)?.to_string();
+    let path = file_contents.next().ok_or(ChecksumError::ImproperFormat)?.into();
+    let hash = file_contents.next().ok_or(ChecksumError::ImproperFormat)?.to_string();
     Ok(Checksum { path, hash })
 }
 
-fn verify_checksum(cfg: &Config, checksum: &Checksum, path: &PathBuf) -> bool {
-    match read_file(&checksum.path) {
+fn verify_checksum(cfg: &Config, checksum: &Checksum, path: &Path) -> bool {
+    match fs::read(&checksum.path) {
         Ok(file_content) => {
             let mut hasher = Sha256::new();
             hasher.update(file_content);
@@ -132,12 +124,12 @@ fn verify_checksum(cfg: &Config, checksum: &Checksum, path: &PathBuf) -> bool {
             let hex = hex::encode(digest);
 
             let status = if hex == checksum.hash { "OK" } else { "FAILED" };
-            print_status(cfg, &path, status.to_string());
+            print_status(cfg, path, status.to_string());
             hex == checksum.hash
         }
         Err(e) => {
             if !cfg.ignore_missing {
-                print_status(cfg, &path, e.to_string());
+                print_status(cfg, path, e.to_string());
             }
             false
         }
@@ -146,24 +138,22 @@ fn verify_checksum(cfg: &Config, checksum: &Checksum, path: &PathBuf) -> bool {
 
 fn verify(cfg: &Config) {
     cfg.input_files.iter()
-        .map(|path| {
-            read_file_to_string(path).map_err(|e| print_status(cfg, path, e.to_string())).ok().map(|data| {
+        .filter_map(|path| {
+            fs::read_to_string(path).map_err(|e| print_status(cfg, path, e.to_string())).ok().map(|data| {
                 RawChecksum { data, path: path.clone() }
             })
         })
-        .flatten()
-        .map(|raw_checksum| {
+        .filter_map(|raw_checksum| {
             parse_checksum(raw_checksum.data)
                 .map_err(|e| print_status(cfg, &raw_checksum.path, e.to_string()))
                 .ok()
         })
-        .flatten()
         .for_each(|ref checksum| {
             verify_checksum(cfg, checksum, &checksum.path);
         })
 }
 
-fn print_status(cfg: &Config, path: &PathBuf, msg: String) {
+fn print_status(cfg: &Config, path: &Path, msg: String) {
     if !cfg.quiet {
         println!("{}: {}", path.display(), msg);
     }
