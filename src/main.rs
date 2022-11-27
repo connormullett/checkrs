@@ -1,4 +1,8 @@
-use std::{fs, path::{PathBuf, Path}};
+use std::{
+    fs,
+    io::{self, Write},
+    path::{PathBuf, Path}
+};
 
 use sha2::{Digest, Sha256};
 use structopt::StructOpt;
@@ -73,6 +77,8 @@ impl ToString for ChecksumError {
 }
 
 fn generate(cfg: &Config) {
+    let stdout = io::stdout();
+    let mut handle = io::BufWriter::new(stdout);
     for path in &cfg.input_files {
         let mut hasher = Sha256::new();
         match fs::read(path) {
@@ -86,19 +92,20 @@ fn generate(cfg: &Config) {
                     path: path.clone(),
                 };
 
-                println!("{}", checksum.to_string());
+                writeln!(handle, "{}", checksum.to_string()).expect("FIXME");
             }
             Err(e) => {
                 print_status(cfg, path, e.to_string());
             }
         }
     }
+    handle.flush().expect("FIXME");
 }
 
 fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
     let mut file_contents = data.trim().split("  ");
-    let path = file_contents.next().ok_or(ChecksumError::ImproperFormat)?.into();
     let hash = file_contents.next().ok_or(ChecksumError::ImproperFormat)?.to_string();
+    let path = file_contents.next().ok_or(ChecksumError::ImproperFormat)?.into();
     Ok(Checksum { path, hash })
 }
 
