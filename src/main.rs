@@ -1,7 +1,7 @@
 use std::{
     fs,
     io::{self, Write},
-    path::{PathBuf, Path}
+    path::{Path, PathBuf},
 };
 
 use sha2::{Digest, Sha256};
@@ -71,7 +71,9 @@ enum ChecksumError {
 impl ToString for ChecksumError {
     fn to_string(&self) -> String {
         match self {
-            ChecksumError::ImproperFormat => "no properly formatted checksum lines found".to_string(),
+            ChecksumError::ImproperFormat => {
+                "no properly formatted checksum lines found".to_string()
+            }
         }
     }
 }
@@ -104,8 +106,14 @@ fn generate(cfg: &Config) {
 
 fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
     let mut file_contents = data.trim().split("  ");
-    let hash = file_contents.next().ok_or(ChecksumError::ImproperFormat)?.to_string();
-    let path = file_contents.next().ok_or(ChecksumError::ImproperFormat)?.into();
+    let hash = file_contents
+        .next()
+        .ok_or(ChecksumError::ImproperFormat)?
+        .to_string();
+    let path = file_contents
+        .next()
+        .ok_or(ChecksumError::ImproperFormat)?
+        .into();
     Ok(Checksum { path, hash })
 }
 
@@ -131,11 +139,16 @@ fn verify_checksum(cfg: &Config, checksum: &Checksum, path: &Path) -> bool {
 }
 
 fn verify(cfg: &Config) {
-    cfg.input_files.iter()
+    cfg.input_files
+        .iter()
         .filter_map(|path| {
-            fs::read_to_string(path).map_err(|e| print_status(cfg, path, e.to_string())).ok().map(|data| {
-                RawChecksum { data, path: path.clone() }
-            })
+            fs::read_to_string(path)
+                .map_err(|e| print_status(cfg, path, e.to_string()))
+                .ok()
+                .map(|data| RawChecksum {
+                    data,
+                    path: path.clone(),
+                })
         })
         .filter_map(|raw_checksum| {
             parse_checksum(raw_checksum.data)
