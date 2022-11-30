@@ -77,8 +77,8 @@ impl ToString for ChecksumError {
 }
 
 fn generate(cfg: &Config) {
-    let stdout = io::stdout();
-    let mut handle = io::BufWriter::new(stdout);
+    let mut handle = io::stdout();
+
     for path in &cfg.input_files {
         let mut hasher = Sha256::new();
         match fs::read(path) {
@@ -165,13 +165,17 @@ fn verify(cfg: &Config) {
         })
         .for_each(|ref checksum| {
             verify_checksum(cfg, checksum, &checksum.path);
-        })
+        });
 }
 
 fn print_status(cfg: &Config, path: &Path, msg: String) {
+    // TODO: Shouldn't have to flush everytime
+    // flush buffer after each call to subcommand ( see generate() )
+    let mut handle = io::stdout();
     if !cfg.quiet {
-        println!("{}: {}", path.display(), msg);
+        writeln!(handle, "{}: {}", path.display(), msg).expect("FIXME");
     }
+    handle.flush().expect("FIXME");
 }
 
 fn main() {
