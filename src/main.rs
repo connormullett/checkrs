@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::fs;
-use std::io::Stdout;
+use std::io::stderr;
 use std::io::{stdout, Write};
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -79,7 +79,15 @@ impl ToString for ChecksumError {
 }
 
 fn generate(cfg: &Config) {
-    let mut handle = stdout();
+    
+    if cfg.quiet {
+        println!("Checkrs: The quiet option is meaningful only when verifying checksums");
+        println!("Try 'checkrs --help' for more information");
+        return
+    }
+
+    let mut stdout = stdout();
+    let mut stderr = stderr();
 
     for path in &cfg.input_files {
         let mut hasher = Sha256::new();
@@ -94,17 +102,16 @@ fn generate(cfg: &Config) {
                     path: path.clone(),
                 };
 
-                writeln!(handle, "{}", checksum.to_string()).expect("FIXME");
+                writeln!(stdout, "{}", checksum.to_string()).expect("FIXME");
             }
             Err(e) => {
-                writeln!(handle, "{}: {}", path.display(), e).expect("FIXME");
+                writeln!(stderr, "{}: {}", path.display(), e).expect("FIXME");
             }
         }
     }
 
-    if !cfg.quiet {
-        handle.flush().expect("FIXME");
-    }
+    stdout.flush().expect("FIXME");
+    stderr.flush().expect("FIXME");
 }
 
 fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
@@ -130,7 +137,7 @@ fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
     Ok(Checksum { path, hash })
 }
 
-fn verify_checksum(cfg: &Config, checksum: &Checksum, handle: &Rc<RefCell<Stdout>>) -> bool {
+fn verify_checksum<W: Write>(cfg: &Config, checksum: &Checksum, handle: &Rc<RefCell<W>>) -> bool {
     match fs::read(&checksum.path) {
         Ok(file_content) => {
             let mut hasher = Sha256::new();
@@ -158,13 +165,13 @@ fn verify_checksum(cfg: &Config, checksum: &Checksum, handle: &Rc<RefCell<Stdout
 }
 
 fn verify(cfg: &Config) {
-    let handle = Rc::new(RefCell::new(stdout()));
+    let stderr = Rc::new(RefCell::new(stderr()));
 
     cfg.input_files
         .iter()
         .filter_map(|path| {
             fs::read_to_string(path)
-                .map_err(|e| writeln!(handle.borrow_mut(), "{}: {}", path.display(), e))
+                .map_err(|e| writeln!(stderr.borrow_mut(), "{}: {}", path.display(), e))
                 .ok()
                 .map(|data| RawChecksum {
                     data,
@@ -174,20 +181,23 @@ fn verify(cfg: &Config) {
         .filter_map(|raw_checksum| {
             parse_checksum(raw_checksum.data)
                 .map_err(|e| {
-                    writeln!(
-                        handle.borrow_mut(),
-                        "{}: {}",
-                        raw_checksum.path.display(),
-                        e.to_string()
-                    )
+                    if !cfg.quiet {
+                        writeln!(
+                            stderr.borrow_mut(),
+                            "{}: {}",
+                            raw_checksum.path.display(),
+                            e.to_string()
+                        )
+                        .expect("FIXME");
+                    }
                 })
                 .ok()
         })
         .for_each(|ref checksum| {
-            verify_checksum(cfg, checksum, &handle);
+            verify_checksum(cfg, checksum, &stderr);
         });
 
-    handle.borrow_mut().flush().expect("FIXME");
+    stderr.borrow_mut().flush().expect("FIXME");
 }
 
 fn main() {
