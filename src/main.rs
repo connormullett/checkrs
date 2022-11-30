@@ -26,6 +26,7 @@ struct Opt {
     #[structopt(short, long)]
     quiet: bool,
 
+    /// The files to be hashed and verified
     #[structopt(parse(from_os_str))]
     input_files: Vec<PathBuf>,
 }
