@@ -65,15 +65,13 @@ impl ToString for Checksum {
 }
 
 enum ChecksumError {
-    ImproperFormat,
+    ImproperFormat(String),
 }
 
 impl ToString for ChecksumError {
     fn to_string(&self) -> String {
         match self {
-            ChecksumError::ImproperFormat => {
-                "no properly formatted checksum lines found".to_string()
-            }
+            ChecksumError::ImproperFormat(msg) => msg.to_owned(),
         }
     }
 }
@@ -108,11 +106,21 @@ fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
     let mut file_contents = data.trim().split("  ");
     let hash = file_contents
         .next()
-        .ok_or(ChecksumError::ImproperFormat)?
+        .ok_or_else(|| {
+            ChecksumError::ImproperFormat(format!(
+                "Invalid checksum format. Affected line had: {}",
+                data
+            ))
+        })?
         .to_string();
     let path = file_contents
         .next()
-        .ok_or(ChecksumError::ImproperFormat)?
+        .ok_or_else(|| {
+            ChecksumError::ImproperFormat(format!(
+                "Invalid checksum format. Affected line had: {}",
+                data
+            ))
+        })?
         .into();
     Ok(Checksum { path, hash })
 }
