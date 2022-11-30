@@ -128,7 +128,9 @@ fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
 }
 
 fn verify_checksum(cfg: &Config, checksum: &Checksum, path: &Path) -> bool {
-    match fs::read(&checksum.path) {
+    let handle = Rc::new(RefCell::new(io::stdout()));
+
+    let verified = match fs::read(path) {
         Ok(file_content) => {
             let mut hasher = Sha256::new();
             hasher.update(file_content);
@@ -136,16 +138,20 @@ fn verify_checksum(cfg: &Config, checksum: &Checksum, path: &Path) -> bool {
             let hex = hex::encode(digest);
 
             let status = if hex == checksum.hash { "OK" } else { "FAILED" };
-            print_status(cfg, path, status.to_string());
+            writeln!(handle.borrow_mut(), "{}: {}", checksum.path.display(), status.to_string());
             hex == checksum.hash
         }
         Err(e) => {
             if !cfg.ignore_missing {
-                print_status(cfg, path, e.to_string());
+                writeln!(handle.borrow_mut(), "{}: {}", path.display(), e.to_string());
             }
             false
         }
-    }
+    };
+
+    handle.borrow_mut().flush().expect("FIXME");
+
+    verified
 }
 
 fn verify(cfg: &Config) {
@@ -179,16 +185,6 @@ fn verify(cfg: &Config) {
         });
 
     handle.borrow_mut().flush().expect("FIXME");
-}
-
-fn print_status(cfg: &Config, path: &Path, msg: String) {
-    // TODO: Shouldn't have to flush everytime
-    // flush buffer after each call to subcommand ( see generate() )
-    let mut handle = io::stdout();
-    if !cfg.quiet {
-        writeln!(handle, "{}: {}", path.display(), msg).expect("FIXME");
-    }
-    handle.flush().expect("FIXME");
 }
 
 fn main() {
