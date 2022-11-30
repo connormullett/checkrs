@@ -6,12 +6,18 @@ Simple Sha256 checksum generation and verification tool.
 
 ## Usage
 
+### Generating Checksums
+
 `checkrs [FLAGS] <input files>...`
 
 To save the generated checksums, redirect to file using the following
 on linux:
 
 `checkrs foo.txt > my_checksums.checksum`
+
+### Verifying Checksums
+
+`checkrs -c my_checksums.checksum`
 
 File extension doesn't matter.
 
