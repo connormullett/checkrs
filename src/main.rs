@@ -1,10 +1,9 @@
 use std::cell::RefCell;
+use std::fs;
+use std::io::Stdout;
+use std::io::{stdout, Write};
+use std::path::PathBuf;
 use std::rc::Rc;
-use std::{
-    fs,
-    io::{self, Write},
-    path::{Path, PathBuf},
-};
 
 use sha2::{Digest, Sha256};
 use structopt::StructOpt;
@@ -79,7 +78,7 @@ impl ToString for ChecksumError {
 }
 
 fn generate(cfg: &Config) {
-    let mut handle = io::stdout();
+    let mut handle = stdout();
 
     for path in &cfg.input_files {
         let mut hasher = Sha256::new();
@@ -97,11 +96,14 @@ fn generate(cfg: &Config) {
                 writeln!(handle, "{}", checksum.to_string()).expect("FIXME");
             }
             Err(e) => {
-                print_status(cfg, path, e.to_string());
+                writeln!(handle, "{}: {}", path.display(), e).expect("FIXME");
             }
         }
     }
-    handle.flush().expect("FIXME");
+
+    if !cfg.quiet {
+        handle.flush().expect("FIXME");
+    }
 }
 
 fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
@@ -127,10 +129,8 @@ fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
     Ok(Checksum { path, hash })
 }
 
-fn verify_checksum(cfg: &Config, checksum: &Checksum, path: &Path) -> bool {
-    let handle = Rc::new(RefCell::new(io::stdout()));
-
-    let verified = match fs::read(path) {
+fn verify_checksum(cfg: &Config, checksum: &Checksum, handle: &Rc<RefCell<Stdout>>) -> bool {
+    match fs::read(&checksum.path) {
         Ok(file_content) => {
             let mut hasher = Sha256::new();
             hasher.update(file_content);
@@ -138,30 +138,32 @@ fn verify_checksum(cfg: &Config, checksum: &Checksum, path: &Path) -> bool {
             let hex = hex::encode(digest);
 
             let status = if hex == checksum.hash { "OK" } else { "FAILED" };
-            writeln!(handle.borrow_mut(), "{}: {}", checksum.path.display(), status.to_string());
+            writeln!(
+                handle.borrow_mut(),
+                "{}: {}",
+                checksum.path.display(),
+                status
+            )
+            .expect("FIXME");
             hex == checksum.hash
         }
         Err(e) => {
             if !cfg.ignore_missing {
-                writeln!(handle.borrow_mut(), "{}: {}", path.display(), e.to_string());
+                writeln!(handle.borrow_mut(), "{}: {}", checksum.path.display(), e).expect("FIXME");
             }
             false
         }
-    };
-
-    handle.borrow_mut().flush().expect("FIXME");
-
-    verified
+    }
 }
 
 fn verify(cfg: &Config) {
-    let handle = Rc::new(RefCell::new(io::stdout()));
+    let handle = Rc::new(RefCell::new(stdout()));
 
     cfg.input_files
         .iter()
         .filter_map(|path| {
             fs::read_to_string(path)
-                .map_err(|e| writeln!(handle.borrow_mut(), "{}: {}", path.display(), e.to_string()))
+                .map_err(|e| writeln!(handle.borrow_mut(), "{}: {}", path.display(), e))
                 .ok()
                 .map(|data| RawChecksum {
                     data,
@@ -181,7 +183,7 @@ fn verify(cfg: &Config) {
                 .ok()
         })
         .for_each(|ref checksum| {
-            verify_checksum(cfg, checksum, &checksum.path);
+            verify_checksum(cfg, checksum, &handle);
         });
 
     handle.borrow_mut().flush().expect("FIXME");
