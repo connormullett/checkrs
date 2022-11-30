@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::{
     fs,
     io::{self, Write},
@@ -147,11 +149,13 @@ fn verify_checksum(cfg: &Config, checksum: &Checksum, path: &Path) -> bool {
 }
 
 fn verify(cfg: &Config) {
+    let handle = Rc::new(RefCell::new(io::stdout()));
+
     cfg.input_files
         .iter()
         .filter_map(|path| {
             fs::read_to_string(path)
-                .map_err(|e| print_status(cfg, path, e.to_string()))
+                .map_err(|e| writeln!(handle.borrow_mut(), "{}: {}", path.display(), e.to_string()))
                 .ok()
                 .map(|data| RawChecksum {
                     data,
@@ -160,12 +164,21 @@ fn verify(cfg: &Config) {
         })
         .filter_map(|raw_checksum| {
             parse_checksum(raw_checksum.data)
-                .map_err(|e| print_status(cfg, &raw_checksum.path, e.to_string()))
+                .map_err(|e| {
+                    writeln!(
+                        handle.borrow_mut(),
+                        "{}: {}",
+                        raw_checksum.path.display(),
+                        e.to_string()
+                    )
+                })
                 .ok()
         })
         .for_each(|ref checksum| {
             verify_checksum(cfg, checksum, &checksum.path);
         });
+
+    handle.borrow_mut().flush().expect("FIXME");
 }
 
 fn print_status(cfg: &Config, path: &Path, msg: String) {
