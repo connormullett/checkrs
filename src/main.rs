@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use sha2::{Digest, Sha256};
 use structopt::StructOpt;
+use verify::Verifier;
 
 mod verify;
 
@@ -166,49 +167,14 @@ fn verify_checksum<W: Write>(cfg: &Config, checksum: &Checksum, handle: &Rc<RefC
     }
 }
 
-fn verify(cfg: &Config) {
-    let stderr = Rc::new(RefCell::new(stderr()));
-
-    cfg.input_files
-        .iter()
-        .filter_map(|path| {
-            fs::read_to_string(path)
-                .map_err(|e| writeln!(stderr.borrow_mut(), "{}: {}", path.display(), e))
-                .ok()
-                .map(|data| RawChecksum {
-                    data,
-                    path: path.clone(),
-                })
-        })
-        .filter_map(|raw_checksum| {
-            parse_checksum(raw_checksum.data)
-                .map_err(|e| {
-                    if !cfg.quiet {
-                        writeln!(
-                            stderr.borrow_mut(),
-                            "{}: {}",
-                            raw_checksum.path.display(),
-                            e.to_string()
-                        )
-                        .expect("FIXME");
-                    }
-                })
-                .ok()
-        })
-        .for_each(|ref checksum| {
-            verify_checksum(cfg, checksum, &stderr);
-        });
-
-    stderr.borrow_mut().flush().expect("FIXME");
-}
-
 fn main() {
     let opt = Opt::from_args();
 
     let cfg = Config::from_opts(&opt);
 
     if cfg.check {
-        verify(&cfg)
+        let verifier = Verifier::new(cfg);
+        verifier.verify();
     } else {
         generate(&cfg)
     };
