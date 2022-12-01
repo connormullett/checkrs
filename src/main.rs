@@ -8,12 +8,14 @@ use std::rc::Rc;
 use sha2::{Digest, Sha256};
 use structopt::StructOpt;
 
+mod verify;
+
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "checkrs",
     about = "Checksum generation and verification tool in Rust"
 )]
-struct Opt {
+pub struct Opt {
     /// read checksum from the FILEs and check them
     #[structopt(short, long)]
     check: bool,
@@ -31,7 +33,8 @@ struct Opt {
     input_files: Vec<PathBuf>,
 }
 
-struct Config {
+#[derive(Debug, Default)]
+pub struct Config {
     check: bool,
     ignore_missing: bool,
     quiet: bool,
@@ -79,11 +82,10 @@ impl ToString for ChecksumError {
 }
 
 fn generate(cfg: &Config) {
-    
     if cfg.quiet {
         println!("Checkrs: The quiet option is meaningful only when verifying checksums");
         println!("Try 'checkrs --help' for more information");
-        return
+        return;
     }
 
     let mut stdout = stdout();
