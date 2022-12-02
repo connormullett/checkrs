@@ -76,8 +76,7 @@ impl Verifier {
                 self.verify_checksum(checksum);
             });
 
-        self.error_handle.borrow_mut().flush().unwrap();
-        self.output_handle.borrow_mut().flush().unwrap();
+        self.flush();
     }
 
     fn verify_checksum(&self, checksum: &Checksum) {
@@ -116,5 +115,10 @@ impl Verifier {
                 }
             }
         }
+    }
+
+    fn flush(&mut self) {
+        self.error_handle.borrow_mut().flush().unwrap();
+        self.output_handle.borrow_mut().flush().unwrap();
     }
 }
