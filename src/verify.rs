@@ -17,8 +17,6 @@ use crate::checksum::Checksum;
 #[derive(Debug)]
 pub struct Verifier {
     config: Config,
-    failures: Vec<Checksum>,
-    status_code: u8,
     error_handle: Rc<RefCell<Stderr>>,
     output_handle: Rc<RefCell<Stdout>>,
 }
@@ -27,8 +25,6 @@ impl Default for Verifier {
     fn default() -> Self {
         Self {
             config: Default::default(),
-            failures: Default::default(),
-            status_code: Default::default(),
             error_handle: Rc::new(RefCell::new(stderr())),
             output_handle: Rc::new(RefCell::new(stdout())),
         }
@@ -44,14 +40,17 @@ impl Verifier {
     }
 
     pub fn verify(&mut self) {
-        self.config
+        let mut input_files = self.config
             .input_files
             .iter()
             .filter_map(|path| {
                 fs::read_to_string(path)
                     .map_err(|e| self.write_error(e.into()))
                     .ok()
-            })
+            }).collect::<Vec<String>>();
+
+        input_files
+            .iter_mut()
             .for_each(|checksum| {
                 checksum
                     .lines()
@@ -60,18 +59,20 @@ impl Verifier {
                             .map_err(|e| self.write_error(e))
                             .ok()
                     })
-                    .for_each(|sum| self.verify_checksum(sum))
+                    .for_each(|sum| self.verify_checksum(&sum))
             });
 
         self.flush();
     }
 
     fn write_error(&self, error: ChecksumError) -> ChecksumError {
-        writeln!(self.error_handle.borrow_mut(), "Error: {}", error).unwrap();
+        if !self.config.quiet {
+            writeln!(self.error_handle.borrow_mut(), "Error: {}", error).unwrap();
+        }
         error
     }
 
-    fn verify_checksum(&self, checksum: Checksum) {
+    fn verify_checksum(&self, checksum: &Checksum) {
         match fs::read(&checksum.path) {
             Ok(file_content) => {
                 let mut hasher = Sha256::new();
@@ -95,17 +96,7 @@ impl Verifier {
                     .unwrap();
                 }
             }
-            Err(e) => {
-                if !self.config.ignore_missing {
-                    writeln!(
-                        self.error_handle.borrow_mut(),
-                        "{}: {}",
-                        checksum.path.display(),
-                        e
-                    )
-                    .unwrap();
-                }
-            }
+            Err(e) => { self.write_error(e.into()); }
         }
     }
 

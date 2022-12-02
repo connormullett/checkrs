@@ -1,7 +1,7 @@
 use std::fmt;
 use std::path::PathBuf;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Checksum {
     pub hash: String,
     pub path: PathBuf,
