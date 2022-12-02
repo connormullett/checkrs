@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 
 use crate::Config;
-use std::fs;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::fs;
 use std::io::stderr;
 use std::io::Write;
+use std::rc::Rc;
 
-use crate::RawChecksum;
+use crate::checksum::RawChecksum;
 use crate::{parse_checksum, verify_checksum};
 
 #[derive(Debug, Default)]
@@ -29,7 +29,8 @@ impl Verifier {
         // TODO: maybe move this handle to be a member?
         let stderr = Rc::new(RefCell::new(stderr()));
 
-        self.config.input_files
+        self.config
+            .input_files
             .iter()
             .filter_map(|path| {
                 fs::read_to_string(path)

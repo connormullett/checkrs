@@ -9,7 +9,12 @@ use sha2::{Digest, Sha256};
 use structopt::StructOpt;
 use verify::Verifier;
 
+mod checksum;
+mod config;
 mod verify;
+
+use checksum::{Checksum, ChecksumError};
+use config::Config;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -32,54 +37,6 @@ pub struct Opt {
     /// The files to be hashed and verified
     #[structopt(parse(from_os_str))]
     input_files: Vec<PathBuf>,
-}
-
-#[derive(Debug, Default)]
-pub struct Config {
-    check: bool,
-    ignore_missing: bool,
-    quiet: bool,
-    input_files: Vec<PathBuf>,
-}
-
-impl Config {
-    pub fn from_opts(opt: &Opt) -> Self {
-        Self {
-            check: opt.check,
-            ignore_missing: opt.ignore_missing,
-            quiet: opt.quiet,
-            input_files: opt.input_files.clone(),
-        }
-    }
-}
-
-struct RawChecksum {
-    pub data: String,
-    pub path: PathBuf,
-}
-
-#[derive(Debug)]
-struct Checksum {
-    hash: String,
-    path: PathBuf,
-}
-
-impl ToString for Checksum {
-    fn to_string(&self) -> String {
-        format!("{}  {}", self.hash, self.path.display())
-    }
-}
-
-enum ChecksumError {
-    ImproperFormat(String),
-}
-
-impl ToString for ChecksumError {
-    fn to_string(&self) -> String {
-        match self {
-            ChecksumError::ImproperFormat(msg) => msg.to_owned(),
-        }
-    }
 }
 
 fn generate(cfg: &Config) {
