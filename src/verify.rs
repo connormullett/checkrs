@@ -58,7 +58,7 @@ impl Verifier {
                     .lines()
                     .filter_map(|sum| {
                         Checksum::try_from(sum.to_string())
-                            .map_err(|e| writeln!(self.error_handle.borrow_mut(), "Error: {}", e))
+                            .map_err(|e| writeln!(self.output_handle.borrow_mut(), "Error: {}", e))
                             .ok()
                     })
                     .for_each(|sum| self.verify_checksum(sum))
