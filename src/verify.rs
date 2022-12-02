@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 
 use crate::Config;
+use sha2::{Digest, Sha256};
 use std::cell::RefCell;
 use std::fs;
 use std::io::stderr;
 use std::io::Stderr;
 use std::io::Write;
 use std::rc::Rc;
-use sha2::{Digest, Sha256};
 
 use crate::checksum::{Checksum, RawChecksum};
 
@@ -44,7 +44,9 @@ impl Verifier {
             .iter()
             .filter_map(|path| {
                 fs::read_to_string(path)
-                    .map_err(|e| writeln!(self.error_handle.borrow_mut(), "{}: {}", path.display(), e))
+                    .map_err(|e| {
+                        writeln!(self.error_handle.borrow_mut(), "{}: {}", path.display(), e)
+                    })
                     .ok()
                     .map(|data| RawChecksum {
                         data,
@@ -93,7 +95,13 @@ impl Verifier {
             }
             Err(e) => {
                 if !self.config.ignore_missing {
-                    writeln!(self.error_handle.borrow_mut(), "{}: {}", checksum.path.display(), e).expect("FIXME");
+                    writeln!(
+                        self.error_handle.borrow_mut(),
+                        "{}: {}",
+                        checksum.path.display(),
+                        e
+                    )
+                    .expect("FIXME");
                 }
                 false
             }
