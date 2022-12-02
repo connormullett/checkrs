@@ -60,16 +60,16 @@ fn generate(cfg: &Config) {
                     path: path.clone(),
                 };
 
-                writeln!(stdout, "{}", checksum.to_string()).expect("FIXME");
+                writeln!(stdout, "{}", checksum.to_string()).unwrap();
             }
             Err(e) => {
-                writeln!(stderr, "{}: {}", path.display(), e).expect("FIXME");
+                writeln!(stderr, "{}: {}", path.display(), e).unwrap();
             }
         }
     }
 
-    stdout.flush().expect("FIXME");
-    stderr.flush().expect("FIXME");
+    stdout.flush().unwrap();
+    stderr.flush().unwrap();
 }
 
 fn main() {

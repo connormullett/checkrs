@@ -5,7 +5,9 @@ use sha2::{Digest, Sha256};
 use std::cell::RefCell;
 use std::fs;
 use std::io::stderr;
+use std::io::stdout;
 use std::io::Stderr;
+use std::io::Stdout;
 use std::io::Write;
 use std::rc::Rc;
 
@@ -17,6 +19,7 @@ pub struct Verifier {
     failures: Vec<Checksum>,
     status_code: u8,
     error_handle: Rc<RefCell<Stderr>>,
+    output_handle: Rc<RefCell<Stdout>>,
 }
 
 impl Default for Verifier {
@@ -26,6 +29,7 @@ impl Default for Verifier {
             failures: Default::default(),
             status_code: Default::default(),
             error_handle: Rc::new(RefCell::new(stderr())),
+            output_handle: Rc::new(RefCell::new(stdout())),
         }
     }
 }
@@ -61,9 +65,9 @@ impl Verifier {
                                 self.error_handle.borrow_mut(),
                                 "{}: {}",
                                 raw_checksum.path.display(),
-                                e.to_string()
+                                e
                             )
-                            .expect("FIXME");
+                            .unwrap();
                         }
                     })
                     .ok()
@@ -72,10 +76,11 @@ impl Verifier {
                 self.verify_checksum(checksum);
             });
 
-        self.error_handle.borrow_mut().flush().expect("FIXME");
+        self.error_handle.borrow_mut().flush().unwrap();
+        self.output_handle.borrow_mut().flush().unwrap();
     }
 
-    fn verify_checksum(&self, checksum: &Checksum) -> bool {
+    fn verify_checksum(&self, checksum: &Checksum) {
         match fs::read(&checksum.path) {
             Ok(file_content) => {
                 let mut hasher = Sha256::new();
@@ -83,15 +88,21 @@ impl Verifier {
                 let digest = hasher.finalize();
                 let hex = hex::encode(digest);
 
-                let status = if hex == checksum.hash { "OK" } else { "FAILED" };
-                writeln!(
-                    self.error_handle.borrow_mut(),
-                    "{}: {}",
-                    checksum.path.display(),
-                    status
-                )
-                .expect("FIXME");
-                hex == checksum.hash
+                if hex == checksum.hash {
+                    writeln!(
+                        self.output_handle.borrow_mut(),
+                        "OK: {}",
+                        checksum.path.display()
+                    )
+                    .unwrap();
+                } else {
+                    writeln!(
+                        self.error_handle.borrow_mut(),
+                        "FAILED: {}",
+                        checksum.path.display(),
+                    )
+                    .unwrap();
+                }
             }
             Err(e) => {
                 if !self.config.ignore_missing {
@@ -101,14 +112,9 @@ impl Verifier {
                         checksum.path.display(),
                         e
                     )
-                    .expect("FIXME");
+                    .unwrap();
                 }
-                false
             }
         }
-    }
-
-    fn report(&self) {
-        todo!()
     }
 }
