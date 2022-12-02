@@ -1,9 +1,7 @@
-use std::cell::RefCell;
 use std::fs;
 use std::io::stderr;
 use std::io::{stdout, Write};
 use std::path::PathBuf;
-use std::rc::Rc;
 
 use sha2::{Digest, Sha256};
 use structopt::StructOpt;
@@ -13,7 +11,7 @@ mod checksum;
 mod config;
 mod verify;
 
-use checksum::{Checksum, ChecksumError};
+use checksum::Checksum;
 use config::Config;
 
 #[derive(Debug, StructOpt)]
@@ -74,63 +72,13 @@ fn generate(cfg: &Config) {
     stderr.flush().expect("FIXME");
 }
 
-fn parse_checksum(data: String) -> Result<Checksum, ChecksumError> {
-    let mut file_contents = data.trim().split("  ");
-    let hash = file_contents
-        .next()
-        .ok_or_else(|| {
-            ChecksumError::ImproperFormat(format!(
-                "Invalid checksum format. Affected line had: {}",
-                data
-            ))
-        })?
-        .to_string();
-    let path = file_contents
-        .next()
-        .ok_or_else(|| {
-            ChecksumError::ImproperFormat(format!(
-                "Invalid checksum format. Affected line had: {}",
-                data
-            ))
-        })?
-        .into();
-    Ok(Checksum { path, hash })
-}
-
-fn verify_checksum<W: Write>(cfg: &Config, checksum: &Checksum, handle: &Rc<RefCell<W>>) -> bool {
-    match fs::read(&checksum.path) {
-        Ok(file_content) => {
-            let mut hasher = Sha256::new();
-            hasher.update(file_content);
-            let digest = hasher.finalize();
-            let hex = hex::encode(digest);
-
-            let status = if hex == checksum.hash { "OK" } else { "FAILED" };
-            writeln!(
-                handle.borrow_mut(),
-                "{}: {}",
-                checksum.path.display(),
-                status
-            )
-            .expect("FIXME");
-            hex == checksum.hash
-        }
-        Err(e) => {
-            if !cfg.ignore_missing {
-                writeln!(handle.borrow_mut(), "{}: {}", checksum.path.display(), e).expect("FIXME");
-            }
-            false
-        }
-    }
-}
-
 fn main() {
     let opt = Opt::from_args();
 
     let cfg = Config::from_opts(&opt);
 
     if cfg.check {
-        let verifier = Verifier::new(cfg);
+        let mut verifier = Verifier::new(cfg);
         verifier.verify();
     } else {
         generate(&cfg)
