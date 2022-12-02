@@ -11,7 +11,7 @@ use std::io::Stdout;
 use std::io::Write;
 use std::rc::Rc;
 
-use crate::checksum::{Checksum, RawChecksum};
+use crate::checksum::Checksum;
 
 #[derive(Debug)]
 pub struct Verifier {
@@ -52,34 +52,22 @@ impl Verifier {
                         writeln!(self.error_handle.borrow_mut(), "{}: {}", path.display(), e)
                     })
                     .ok()
-                    .map(|data| RawChecksum {
-                        data,
-                        path: path.clone(),
-                    })
             })
-            .filter_map(|raw_checksum| {
-                Checksum::try_from(raw_checksum.data)
-                    .map_err(|e| {
-                        if !self.config.quiet {
-                            writeln!(
-                                self.error_handle.borrow_mut(),
-                                "{}: {}",
-                                raw_checksum.path.display(),
-                                e
-                            )
-                            .unwrap();
-                        }
+            .for_each(|checksum| {
+                checksum
+                    .lines()
+                    .filter_map(|sum| {
+                        Checksum::try_from(sum.to_string())
+                            .map_err(|e| writeln!(self.error_handle.borrow_mut(), "Error: {}", e))
+                            .ok()
                     })
-                    .ok()
-            })
-            .for_each(|ref checksum| {
-                self.verify_checksum(checksum);
+                    .for_each(|sum| self.verify_checksum(sum))
             });
 
         self.flush();
     }
 
-    fn verify_checksum(&self, checksum: &Checksum) {
+    fn verify_checksum(&self, checksum: Checksum) {
         match fs::read(&checksum.path) {
             Ok(file_content) => {
                 let mut hasher = Sha256::new();

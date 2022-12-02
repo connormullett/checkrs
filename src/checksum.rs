@@ -1,11 +1,6 @@
 use std::fmt;
 use std::path::PathBuf;
 
-pub struct RawChecksum {
-    pub data: String,
-    pub path: PathBuf,
-}
-
 #[derive(Debug)]
 pub struct Checksum {
     pub hash: String,
