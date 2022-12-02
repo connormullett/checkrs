@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::checksum::ChecksumError;
 use crate::Config;
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
@@ -48,9 +49,7 @@ impl Verifier {
             .iter()
             .filter_map(|path| {
                 fs::read_to_string(path)
-                    .map_err(|e| {
-                        writeln!(self.error_handle.borrow_mut(), "{}: {}", path.display(), e)
-                    })
+                    .map_err(|e| self.write_error(e.into()))
                     .ok()
             })
             .for_each(|checksum| {
@@ -58,13 +57,18 @@ impl Verifier {
                     .lines()
                     .filter_map(|sum| {
                         Checksum::try_from(sum.to_string())
-                            .map_err(|e| writeln!(self.output_handle.borrow_mut(), "Error: {}", e))
+                            .map_err(|e| self.write_error(e))
                             .ok()
                     })
                     .for_each(|sum| self.verify_checksum(sum))
             });
 
         self.flush();
+    }
+
+    fn write_error(&self, error: ChecksumError) -> ChecksumError {
+        writeln!(self.error_handle.borrow_mut(), "Error: {}", error).unwrap();
+        error
     }
 
     fn verify_checksum(&self, checksum: Checksum) {

@@ -53,6 +53,12 @@ impl ChecksumError {
     }
 }
 
+impl From<std::io::Error> for ChecksumError {
+    fn from(error: std::io::Error) -> Self {
+        Self::ImproperFormat(error.to_string())
+    }
+}
+
 impl fmt::Display for ChecksumError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
